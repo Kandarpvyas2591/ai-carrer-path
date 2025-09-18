@@ -8,6 +8,7 @@ import RoadmapView from './components/RoadmapView';
 function App() {
   const [currentView, setCurrentView] = useState('landing');
   const [user, setUser] = useState(null);
+  const [roadmapData, setRoadmapData] = useState(null);
   const [savedRoadmaps, setSavedRoadmaps] = useState([
     {
       id: 1,
@@ -97,9 +98,9 @@ function App() {
           />
         );
       case 'input-form':
-        return <InputForm setCurrentView={setCurrentView} />;
+        return <InputForm setCurrentView={setCurrentView} setRoadmapData={setRoadmapData} />;
       case 'roadmap-view':
-        return <RoadmapView sampleRoadmap={sampleRoadmap} />;
+        return <RoadmapView roadmapData={roadmapData || sampleRoadmap} setCurrentView={setCurrentView} />;
       default:
         return <LandingPage setCurrentView={setCurrentView} />;
     }

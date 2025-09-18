@@ -10,51 +10,87 @@ import {
   Award,
 } from 'lucide-react';
 
-const RoadmapView = ({ sampleRoadmap }) => (
+const RoadmapView = ({ roadmapData, setCurrentView }) => {
+  // Handle both AI-generated data and sample data
+  const isAIData = roadmapData && roadmapData.roadmap;
+  
+  const title = isAIData ? 'Your AI-Generated Career Roadmap' : roadmapData?.title || 'Career Roadmap';
+  const summary = roadmapData?.summary || 'Your personalized career journey';
+  const totalDuration = roadmapData?.totalEstimatedDuration;
+  const roadmap = isAIData ? roadmapData.roadmap : roadmapData?.timeline;
+
+  return (
   <div className="min-h-screen bg-gray-50">
     <Navigation />
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {sampleRoadmap.title}
+            {title}
           </h1>
-          <p className="text-gray-600 mt-2">Your personalized career journey</p>
+          <p className="text-gray-600 mt-2">{summary}</p>
+          {totalDuration && (
+            <p className="text-sm text-blue-600 mt-1">
+              Estimated Duration: {totalDuration}
+            </p>
+          )}
         </div>
         <div className="flex space-x-3">
           <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
             <Save className="h-4 w-4 mr-2" />
             Save Roadmap
           </button>
-          <button className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+          <button 
+            onClick={() => setCurrentView('input-form')}
+            className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
             <Edit className="h-4 w-4 mr-2" />
-            Edit
+            Create New Roadmap
           </button>
         </div>
       </div>
       <div className="bg-white rounded-lg shadow p-8">
         <div className="relative">
           <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-blue-200"></div>
-          {sampleRoadmap.timeline.map((phase, index) => (
+          {roadmap && roadmap.map((phase, index) => (
             <div key={index} className="relative mb-12 last:mb-0">
               <div className="absolute left-6 w-4 h-4 bg-blue-600 rounded-full border-4 border-white shadow-md"></div>
               <div className="ml-16">
                 <div className="flex items-center mb-4">
                   <Calendar className="h-5 w-5 text-blue-600 mr-2" />
                   <span className="text-sm font-medium text-blue-600">
-                    {phase.year}
+                    {phase.timeline || phase.year}
                   </span>
+                  {phase.difficulty && (
+                    <span className="ml-3 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded">
+                      {phase.difficulty}
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">
                   {phase.title}
                 </h3>
+                <p className="text-gray-700 mb-4">{phase.description}</p>
+                {phase.estimatedDuration && (
+                  <p className="text-sm text-blue-600 mb-4">
+                    Duration: {phase.estimatedDuration}
+                  </p>
+                )}
                 <div className="grid gap-3">
-                  {phase.items.map((item, itemIndex) => (
-                    <div key={itemIndex} className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
-                      <span className="text-gray-700">{item}</span>
-                    </div>
-                  ))}
+                  {isAIData && phase.resources && phase.resources.length > 0 ? (
+                    phase.resources.map((resource, itemIndex) => (
+                      <div key={itemIndex} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
+                        <span className="text-gray-700">{resource}</span>
+                      </div>
+                    ))
+                  ) : (
+                    phase.items && phase.items.map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
+                        <span className="text-gray-700">{item}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -105,6 +141,7 @@ const RoadmapView = ({ sampleRoadmap }) => (
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default RoadmapView;
