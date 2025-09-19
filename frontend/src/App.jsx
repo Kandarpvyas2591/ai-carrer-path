@@ -86,29 +86,15 @@ function App() {
             path="/dashboard"
             element={<Dashboard user={user} savedRoadmaps={savedRoadmaps} />}
           />
-<<<<<<< HEAD
           <Route path="/input-form" element={<InputForm />} />
           <Route
             path="/roadmap-view"
-            element={<RoadmapView sampleRoadmap={sampleRoadmap} />}
+            element={<RoadmapView roadmapData={sampleRoadmap} />}
           />
         </Routes>
       </div>
     </Router>
   );
-=======
-        );
-      case 'input-form':
-        return <InputForm setCurrentView={setCurrentView} setRoadmapData={setRoadmapData} />;
-      case 'roadmap-view':
-        return <RoadmapView roadmapData={roadmapData || sampleRoadmap} setCurrentView={setCurrentView} />;
-      default:
-        return <LandingPage setCurrentView={setCurrentView} />;
-    }
-  };
-
-  return <div className="min-h-screen">{renderCurrentView()}</div>;
->>>>>>> 6b83bb4dec5df302f78c8a37398221490edb20f7
 }
 
 export default App;
