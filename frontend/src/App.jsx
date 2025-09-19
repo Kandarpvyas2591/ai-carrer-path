@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
@@ -6,7 +7,6 @@ import InputForm from './components/InputForm';
 import RoadmapView from './components/RoadmapView';
 
 function App() {
-  const [currentView, setCurrentView] = useState('landing');
   const [user, setUser] = useState(null);
   const [savedRoadmaps, setSavedRoadmaps] = useState([
     {
@@ -68,44 +68,32 @@ function App() {
     ],
   };
 
-  const renderCurrentView = () => {
-    switch (currentView) {
-      case 'landing':
-        return <LandingPage setCurrentView={setCurrentView} />;
-      case 'login':
-        return (
-          <AuthForm
-            type="login"
-            setUser={setUser}
-            setCurrentView={setCurrentView}
+  return (
+    <Router>
+      <div className="min-h-screen">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route
+            path="/login"
+            element={<AuthForm type="login" setUser={setUser} />}
           />
-        );
-      case 'register':
-        return (
-          <AuthForm
-            type="register"
-            setUser={setUser}
-            setCurrentView={setCurrentView}
+          <Route
+            path="/signup"
+            element={<AuthForm type="register" setUser={setUser} />}
           />
-        );
-      case 'dashboard':
-        return (
-          <Dashboard
-            user={user}
-            savedRoadmaps={savedRoadmaps}
-            setCurrentView={setCurrentView}
+          <Route
+            path="/dashboard"
+            element={<Dashboard user={user} savedRoadmaps={savedRoadmaps} />}
           />
-        );
-      case 'input-form':
-        return <InputForm setCurrentView={setCurrentView} />;
-      case 'roadmap-view':
-        return <RoadmapView sampleRoadmap={sampleRoadmap} />;
-      default:
-        return <LandingPage setCurrentView={setCurrentView} />;
-    }
-  };
-
-  return <div className="min-h-screen">{renderCurrentView()}</div>;
+          <Route path="/input-form" element={<InputForm />} />
+          <Route
+            path="/roadmap-view"
+            element={<RoadmapView sampleRoadmap={sampleRoadmap} />}
+          />
+        </Routes>
+      </div>
+    </Router>
+  );
 }
 
 export default App;
