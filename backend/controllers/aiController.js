@@ -3,6 +3,8 @@ import AIProfile from "../models/AIProfile.js";
 import User from "../models/User.js";
 
 export const generateCareerRoadmap = async (req, res) => {
+  let aiProfile = null; // Declare outside try block to avoid ReferenceError
+  
   try {
     const { 
       currentSkills, 
@@ -17,7 +19,7 @@ export const generateCareerRoadmap = async (req, res) => {
     const userId = req.userId;
 
     // Create AI profile record first
-    const aiProfile = new AIProfile({
+    aiProfile = new AIProfile({
       userId,
       profile: {
         currentSkills,
@@ -32,7 +34,7 @@ export const generateCareerRoadmap = async (req, res) => {
 
     await aiProfile.save();
 
-    // Strong prompt to force JSON response
+    // Strong prompt to force JSON response with correct difficulty values
     const prompt = `
       Generate a comprehensive career roadmap based on the following user profile:
       - Current Skills: ${currentSkills}
@@ -54,7 +56,7 @@ export const generateCareerRoadmap = async (req, res) => {
             "timeline": "Months 1-3",
             "resources": ["Resource 1", "Resource 2"],
             "estimatedDuration": "2-3 months",
-            "difficulty": "Beginner"
+            
           }
         ],
         "summary": "Brief overview of the career path",
@@ -90,9 +92,11 @@ export const generateCareerRoadmap = async (req, res) => {
       console.error("JSON Parse Error:", rawOutput);
       
       // Update AI profile with error status
-      aiProfile.status = "failed";
-      aiProfile.errorMessage = "Failed to parse JSON from AI";
-      await aiProfile.save();
+      if (aiProfile) {
+        aiProfile.status = "failed";
+        aiProfile.errorMessage = "Failed to parse JSON from AI";
+        await aiProfile.save();
+      }
 
       return res.status(500).json({
         success: false,
@@ -186,6 +190,46 @@ export const getProfileById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error fetching profile",
+      error: error.message,
+    });
+  }
+};
+
+// Delete AI profile by ID
+export const deleteProfile = async (req, res) => {
+  try {
+    const { profileId } = req.params;
+    const userId = req.userId;
+
+    // Find and delete the profile (only if it belongs to the user)
+    const deletedProfile = await AIProfile.findOneAndDelete({ 
+      _id: profileId, 
+      userId 
+    });
+
+    if (!deletedProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found or you don't have permission to delete it",
+      });
+    }
+
+    // Remove the profile ID from user's aiProfiles array
+    await User.findByIdAndUpdate(
+      userId,
+      { $pull: { aiProfiles: profileId } },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Profile deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting profile:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting profile",
       error: error.message,
     });
   }

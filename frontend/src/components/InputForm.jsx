@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navigation from './Navigation';
+import aiService from '../services/aiService';
 
-const InputForm = ({ setCurrentView, setRoadmapData }) => {
+const InputForm = ({ setRoadmapData, user, onLogout }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     currentSkills: '',
     careerInterests: '',
@@ -47,25 +50,16 @@ const InputForm = ({ setCurrentView, setRoadmapData }) => {
     }
 
     try {
-      const response = await fetch('/api/v1/ai/career-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies in the request
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
+      const data = await aiService.generateCareerRoadmap(formData);
 
       if (data.success) {
-        setRoadmapData(data);
-        setCurrentView('roadmap-view');
+        setRoadmapData && setRoadmapData(data);
+        navigate('/roadmap-view');
       } else {
         setError(data.message || 'Failed to generate roadmap');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError(err.message || 'Network error. Please try again.');
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -74,7 +68,7 @@ const InputForm = ({ setCurrentView, setRoadmapData }) => {
 
   return (
   <div className="min-h-screen bg-gray-50">
-    <Navigation />
+    <Navigation user={user} onLogout={onLogout} />
     <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="bg-white rounded-lg shadow p-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">

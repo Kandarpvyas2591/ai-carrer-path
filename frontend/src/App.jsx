@@ -1,28 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
 import RoadmapView from './components/RoadmapView';
+import authService from './services/authService';
 
 function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [roadmapData, setRoadmapData] = useState(null);
-  const [savedRoadmaps, setSavedRoadmaps] = useState([
-    {
-      id: 1,
-      title: 'Software Engineer Path',
-      created: '2024-01-15',
-      progress: 65,
-    },
-    {
-      id: 2,
-      title: 'Data Scientist Journey',
-      created: '2024-01-20',
-      progress: 30,
-    },
-  ]);
+
+  // Check if user is already logged in on app load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await authService.getMe();
+        setUser(response.user);
+      } catch {
+        // User is not authenticated, this is normal
+        console.log('No authenticated user found');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
   const sampleRoadmap = {
     title: 'Software Engineer Career Path',
     timeline: [
@@ -69,6 +84,17 @@ function App() {
     ],
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <div className="min-h-screen">
@@ -84,12 +110,15 @@ function App() {
           />
           <Route
             path="/dashboard"
-            element={<Dashboard user={user} savedRoadmaps={savedRoadmaps} />}
+            element={<Dashboard user={user} onLogout={handleLogout} />}
           />
-          <Route path="/input-form" element={<InputForm />} />
+          <Route 
+            path="/input-form" 
+            element={<InputForm setRoadmapData={setRoadmapData} user={user} onLogout={handleLogout} />} 
+          />
           <Route
             path="/roadmap-view"
-            element={<RoadmapView roadmapData={sampleRoadmap} />}
+            element={<RoadmapView roadmapData={roadmapData || sampleRoadmap} user={user} onLogout={handleLogout} />}
           />
         </Routes>
       </div>

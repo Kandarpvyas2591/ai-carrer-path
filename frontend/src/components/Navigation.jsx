@@ -1,8 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Menu, X } from 'lucide-react';
+import { Brain, Menu, X, User } from 'lucide-react';
 
-const Navigation = ({ user, setUser, isMenuOpen, setIsMenuOpen }) => {
+const Navigation = ({ user, onLogout, isMenuOpen, setIsMenuOpen }) => {
   const navigate = useNavigate();
   return (
     <nav className="bg-white shadow-lg sticky top-0 z-50">
@@ -20,6 +20,10 @@ const Navigation = ({ user, setUser, isMenuOpen, setIsMenuOpen }) => {
             <div className="ml-10 flex items-baseline space-x-4">
               {user ? (
                 <>
+                  <span className="text-gray-700 text-sm font-medium flex items-center">
+                    <User className="h-4 w-4 mr-1" />
+                    Welcome, {user.username || user.name}
+                  </span>
                   <button
                     onClick={() => navigate('/dashboard')}
                     className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
@@ -32,10 +36,10 @@ const Navigation = ({ user, setUser, isMenuOpen, setIsMenuOpen }) => {
                   </button>
                   <button
                     onClick={() => {
-                      setUser(null);
+                      onLogout && onLogout();
                       navigate('/');
                     }}
-                    className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium">
+                    className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700">
                     Logout
                   </button>
                 </>
@@ -73,6 +77,11 @@ const Navigation = ({ user, setUser, isMenuOpen, setIsMenuOpen }) => {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
             {user ? (
               <>
+                <div className="px-3 py-2 text-sm font-medium text-gray-900 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Welcome, {user.username || user.name}
+                </div>
+                <div className="border-t border-gray-200 my-2"></div>
                 <button
                   onClick={() => {
                     navigate('/dashboard');
@@ -91,11 +100,11 @@ const Navigation = ({ user, setUser, isMenuOpen, setIsMenuOpen }) => {
                 </button>
                 <button
                   onClick={() => {
-                    setUser(null);
+                    onLogout && onLogout();
                     navigate('/');
                     setIsMenuOpen(false);
                   }}
-                  className="block text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-base font-medium w-full text-left">
+                  className="block bg-red-600 text-white px-3 py-2 rounded-md text-base font-medium w-full text-left hover:bg-red-700">
                   Logout
                 </button>
               </>

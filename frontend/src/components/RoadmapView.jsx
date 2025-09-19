@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Navigation from './Navigation';
 import {
   Save,
@@ -10,18 +11,24 @@ import {
   Award,
 } from 'lucide-react';
 
-const RoadmapView = ({ roadmapData, setCurrentView }) => {
-  // Handle both AI-generated data and sample data
-  const isAIData = roadmapData && roadmapData.roadmap;
+const RoadmapView = ({ roadmapData, user, onLogout }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   
-  const title = isAIData ? 'Your AI-Generated Career Roadmap' : roadmapData?.title || 'Career Roadmap';
-  const summary = roadmapData?.summary || 'Your personalized career journey';
-  const totalDuration = roadmapData?.totalEstimatedDuration;
-  const roadmap = isAIData ? roadmapData.roadmap : roadmapData?.timeline;
+  // Get roadmap data from props or location state
+  const currentRoadmapData = roadmapData || location.state?.roadmapData;
+  
+  // Handle both AI-generated data and sample data
+  const isAIData = currentRoadmapData && currentRoadmapData.roadmap;
+  
+  const title = isAIData ? 'Your AI-Generated Career Roadmap' : currentRoadmapData?.title || 'Career Roadmap';
+  const summary = currentRoadmapData?.summary || 'Your personalized career journey';
+  const totalDuration = currentRoadmapData?.totalEstimatedDuration;
+  const roadmap = isAIData ? currentRoadmapData.roadmap : currentRoadmapData?.timeline;
 
   return (
   <div className="min-h-screen bg-gray-50">
-    <Navigation />
+    <Navigation user={user} onLogout={onLogout} />
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -41,10 +48,15 @@ const RoadmapView = ({ roadmapData, setCurrentView }) => {
             Save Roadmap
           </button>
           <button 
-            onClick={() => setCurrentView('input-form')}
+            onClick={() => navigate('/input-form')}
             className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
             <Edit className="h-4 w-4 mr-2" />
             Create New Roadmap
+          </button>
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+            Back to Dashboard
           </button>
         </div>
       </div>
