@@ -1,7 +1,78 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Navigation from './Navigation';
 
-const InputForm = ({ setCurrentView }) => (
+const InputForm = ({ setCurrentView, setRoadmapData }) => {
+  const [formData, setFormData] = useState({
+    currentSkills: '',
+    careerInterests: '',
+    educationalBackground: '',
+    workExperience: '',
+    careerGoals: '',
+    personalValues: []
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCheckboxChange = (value) => {
+    setFormData(prev => ({
+      ...prev,
+      personalValues: prev.personalValues.includes(value)
+        ? prev.personalValues.filter(v => v !== value)
+        : [...prev.personalValues, value]
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    // Validation
+    if (!formData.currentSkills.trim() || 
+        !formData.careerInterests.trim() || 
+        !formData.educationalBackground || 
+        !formData.workExperience || 
+        !formData.careerGoals.trim()) {
+      setError('Please fill in all required fields');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/v1/ai/career-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies in the request
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setRoadmapData(data);
+        setCurrentView('roadmap-view');
+      } else {
+        setError(data.message || 'Failed to generate roadmap');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
   <div className="min-h-screen bg-gray-50">
     <Navigation />
     <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
@@ -13,32 +84,53 @@ const InputForm = ({ setCurrentView }) => (
           We'll use this information to create a personalized career roadmap
           just for you.
         </p>
-        <div className="space-y-6">
+        
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-600">{error}</p>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Current Skills
+              Current Skills *
             </label>
             <textarea
+              name="currentSkills"
+              value={formData.currentSkills}
+              onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows="3"
               placeholder="e.g., JavaScript, Python, Problem-solving, Communication..."
+              required
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Career Interests
+              Career Interests *
             </label>
             <textarea
+              name="careerInterests"
+              value={formData.careerInterests}
+              onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows="3"
               placeholder="e.g., Software Development, Data Science, Artificial Intelligence..."
+              required
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Educational Background
+              Educational Background *
             </label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select 
+              name="educationalBackground"
+              value={formData.educationalBackground}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
               <option value="">Select your education level</option>
               <option value="high-school">High School</option>
               <option value="bachelor">Bachelor's Degree</option>
@@ -50,9 +142,15 @@ const InputForm = ({ setCurrentView }) => (
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Work Experience
+              Work Experience *
             </label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select 
+              name="workExperience"
+              value={formData.workExperience}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            >
               <option value="">Select your experience level</option>
               <option value="0">No experience</option>
               <option value="1-2">1-2 years</option>
@@ -63,12 +161,16 @@ const InputForm = ({ setCurrentView }) => (
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Career Goals
+              Career Goals *
             </label>
             <textarea
+              name="careerGoals"
+              value={formData.careerGoals}
+              onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows="3"
               placeholder="e.g., Become a senior developer, Start my own company, Work at a FAANG company..."
+              required
             />
           </div>
           <div>
@@ -85,21 +187,28 @@ const InputForm = ({ setCurrentView }) => (
                 'Social Impact',
               ].map((value) => (
                 <label key={value} className="flex items-center">
-                  <input type="checkbox" className="mr-2 text-blue-600" />
+                  <input 
+                    type="checkbox" 
+                    checked={formData.personalValues.includes(value)}
+                    onChange={() => handleCheckboxChange(value)}
+                    className="mr-2 text-blue-600" 
+                  />
                   <span className="text-sm text-gray-700">{value}</span>
                 </label>
               ))}
             </div>
           </div>
           <button
-            onClick={() => setCurrentView('roadmap-view')}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-            Generate My Career Roadmap
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? 'Generating Roadmap...' : 'Generate My Career Roadmap'}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 export default InputForm;

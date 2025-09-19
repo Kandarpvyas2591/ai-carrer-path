@@ -46,6 +46,14 @@ const userSchema = new mongoose.Schema(
       ],
     },
 
+    // Reference to AI profiles created by this user
+    aiProfiles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AIProfile",
+      },
+    ],
+
     // Simple progress tracking (optional but minimal)
     // progress: {
     //   currentStep: { type: Number, default: 0 },
