@@ -109,6 +109,22 @@ const aiProfileSchema = new mongoose.Schema(
       },
     },
 
+    // User progress tracking
+    progress: {
+      completedSteps: [
+        {
+          type: Number,
+        },
+      ],
+      notes: [
+        {
+          stepNumber: { type: Number },
+          note: { type: String, trim: true },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+    },
+
     // Metadata
     status: {
       type: String,

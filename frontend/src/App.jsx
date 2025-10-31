@@ -5,6 +5,7 @@ import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
 import InputForm from './components/InputForm';
 import RoadmapView from './components/RoadmapView';
+import ProgressTracker from './components/ProgressTracker';
 import authService from './services/authService';
 
 function App() {
@@ -119,6 +120,10 @@ function App() {
           <Route
             path="/roadmap-view"
             element={<RoadmapView roadmapData={roadmapData || sampleRoadmap} user={user} onLogout={handleLogout} />}
+          />
+          <Route
+            path="/progress"
+            element={<ProgressTracker user={user} onLogout={handleLogout} />}
           />
         </Routes>
       </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Navigation from './Navigation';
 import {
@@ -10,13 +10,15 @@ import {
   ChevronRight,
   Award,
 } from 'lucide-react';
+import aiService from '../services/aiService';
 
 const RoadmapView = ({ roadmapData, user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Get roadmap data from props or location state
-  const currentRoadmapData = roadmapData || location.state?.roadmapData;
+  // Get roadmap data from props or location state; allow dynamic load override
+  const [loadedData, setLoadedData] = useState(null);
+  const currentRoadmapData = loadedData || roadmapData || location.state?.roadmapData;
   
   // Handle both AI-generated data and sample data
   const isAIData = currentRoadmapData && currentRoadmapData.roadmap;
@@ -26,10 +28,56 @@ const RoadmapView = ({ roadmapData, user, onLogout }) => {
   const totalDuration = currentRoadmapData?.totalEstimatedDuration;
   const roadmap = isAIData ? currentRoadmapData.roadmap : currentRoadmapData?.timeline;
 
+  // const profileId = currentRoadmapData?.profileId; // tracking removed
+  // Tracking UI removed for RoadmapView; progress is handled in ProgressTracker
+
+  // If demo is showing but user is logged in, try auto-load latest AI roadmap
+  useEffect(() => {
+    const tryLoadLatest = async () => {
+      if (isAIData || !user) return;
+      try {
+        const res = await aiService.getUserProfiles();
+        const latest = res?.profiles?.[0];
+        if (!latest?._id) return;
+        const detail = await aiService.getProfileById(latest._id);
+        const p = detail?.profile;
+        if (p?.aiResponse?.roadmap) {
+          setLoadedData({
+            roadmap: p.aiResponse.roadmap,
+            summary: p.aiResponse.summary,
+            totalEstimatedDuration: p.aiResponse.totalEstimatedDuration,
+            profileId: p._id,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    tryLoadLatest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Removed tracking state effects
+
+  // Removed tracking handlers from view-only page
+
   return (
   <div className="min-h-screen bg-gray-50">
     <Navigation user={user} onLogout={onLogout} />
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      {!isAIData && (
+        <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-blue-800">
+          <div className="flex items-center justify-between">
+            <div>
+              You are viewing a demo roadmap. To track progress, open one of your generated roadmaps or create a new one.
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => navigate('/dashboard')} className="px-3 py-2 border border-blue-300 rounded text-blue-700 bg-white hover:bg-blue-50">Open My Roadmaps</button>
+              <button onClick={() => navigate('/input-form')} className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Generate Roadmap</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -104,11 +152,15 @@ const RoadmapView = ({ roadmapData, user, onLogout }) => {
                     ))
                   )}
                 </div>
+
+                {/* Progress tracking UI removed here; use ProgressTracker instead */}
               </div>
             </div>
           ))}
         </div>
+        {/* Actions removed on view page */}
       </div>
+      {/* Next steps list removed on view page */}
       <div className="mt-8 grid md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">

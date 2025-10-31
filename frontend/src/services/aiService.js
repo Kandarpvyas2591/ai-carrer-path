@@ -84,6 +84,44 @@ class AIService {
       throw error;
     }
   }
+
+  async updateProgress(profileId, payload) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/profiles/${profileId}/progress`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update progress');
+      }
+      return data;
+    } catch (error) {
+      console.error('Update progress error:', error);
+      throw error;
+    }
+  }
+
+  async suggestNextSteps(profileId, completedSteps, message, history) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/ai/profiles/${profileId}/next-steps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ completedSteps, message, history }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to get next steps');
+      }
+      return data;
+    } catch (error) {
+      console.error('Suggest next steps error:', error);
+      throw error;
+    }
+  }
 }
 
 export default new AIService();

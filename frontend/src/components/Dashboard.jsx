@@ -8,6 +8,7 @@ const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [userRoadmaps, setUserRoadmaps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [progressById, setProgressById] = useState({});
   const [error, setError] = useState('');
 
   // Fetch user's roadmaps on component mount
@@ -23,6 +24,29 @@ const Dashboard = ({ user, onLogout }) => {
         const response = await aiService.getUserProfiles();
         if (response.success) {
           setUserRoadmaps(response.profiles);
+          // After list load, fetch details to compute accurate progress
+          try {
+            const details = await Promise.all(
+              (response.profiles || []).map(async (p) => {
+                try {
+                  const d = await aiService.getProfileById(p._id);
+                  const road = d?.profile?.aiResponse?.roadmap || [];
+                  const done = Array.isArray(d?.profile?.progress?.completedSteps)
+                    ? d.profile.progress.completedSteps.length
+                    : 0;
+                  const total = Array.isArray(road) ? road.length : 0;
+                  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+                  return [p._id, { pct, done, total }];
+                } catch (_) {
+                  return [p._id, { pct: 0, done: 0, total: 0 }];
+                }
+              })
+            );
+            const map = Object.fromEntries(details);
+            setProgressById(map);
+          } catch (_) {
+            // ignore
+          }
         } else {
           setError('Failed to load roadmaps');
         }
@@ -115,20 +139,28 @@ const Dashboard = ({ user, onLogout }) => {
             <h3 className="text-lg font-semibold">Create New Roadmap</h3>
             <p className="text-blue-100">Start building your career path</p>
           </button>
-          <div className="bg-white p-6 rounded-lg shadow">
+          <button
+            onClick={async () => {
+              try {
+                const res = await aiService.getUserProfiles();
+                const latest = res?.profiles?.[0];
+                if (latest?._id) {
+                  navigate(`/progress?profileId=${latest._id}`);
+                } else {
+                  navigate('/progress');
+                }
+              } catch (_) {
+                navigate('/progress');
+              }
+            }}
+            className="bg-white p-6 rounded-lg shadow text-left hover:shadow-md transition-shadow">
             <TrendingUp className="h-8 w-8 text-green-600 mb-2" />
             <h3 className="text-lg font-semibold text-gray-900">
               Progress Tracking
             </h3>
             <p className="text-gray-600">Monitor your career milestones</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <Users className="h-8 w-8 text-purple-600 mb-2" />
-            <h3 className="text-lg font-semibold text-gray-900">
-              Career Insights
-            </h3>
-            <p className="text-gray-600">Get personalized recommendations</p>
-          </div>
+          </button>
+          {/* Career Insights removed as requested */}
         </div>
 
         <div className="bg-white rounded-lg shadow">
@@ -169,19 +201,42 @@ const Dashboard = ({ user, onLogout }) => {
                     <p className="text-sm text-gray-500">
                       Duration: {roadmap.aiResponse?.totalEstimatedDuration || 'N/A'}
                     </p>
-                    <div className="mt-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        roadmap.status === 'completed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : roadmap.status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {roadmap.status}
-                      </span>
-                    </div>
+                    {(() => {
+                      const cached = progressById[roadmap._id];
+                      const total = cached?.total ?? (Array.isArray(roadmap.aiResponse?.roadmap) ? roadmap.aiResponse.roadmap.length : 0);
+                      const done = cached?.done ?? (Array.isArray(roadmap.progress?.completedSteps) ? roadmap.progress.completedSteps.length : 0);
+                      const pct = cached?.pct ?? (total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0);
+                      let computed = 'not_started';
+                      if (total > 0 && done >= total) computed = 'completed';
+                      else if (done > 0) computed = 'in_progress';
+                      return (
+                        <div className="mt-2 flex items-center gap-3">
+                          <div className="w-40">
+                            <div className="w-full h-2 bg-gray-100 rounded">
+                              <div className="h-2 bg-blue-600 rounded" style={{ width: `${pct}%` }} />
+                            </div>
+                            <p className="text-[11px] text-gray-600 mt-1">{pct}%</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            computed === 'completed'
+                              ? 'bg-green-100 text-green-800'
+                              : computed === 'in_progress'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {computed}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex space-x-2">
+                    <button
+                      onClick={() => navigate(`/progress?profileId=${roadmap._id}`)}
+                      className="p-2 text-green-700 hover:bg-green-50 rounded"
+                      title="Track Progress">
+                      Track
+                    </button>
                     <button
                       onClick={() => handleViewRoadmap(roadmap._id)}
                       className="p-2 text-blue-600 hover:bg-blue-50 rounded"

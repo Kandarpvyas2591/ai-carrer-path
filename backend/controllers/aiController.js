@@ -1,18 +1,18 @@
-import axios from "axios";
-import AIProfile from "../models/AIProfile.js";
-import User from "../models/User.js";
+import axios from 'axios';
+import AIProfile from '../models/AIProfile.js';
+import User from '../models/User.js';
 
 export const generateCareerRoadmap = async (req, res) => {
   let aiProfile = null; // Declare outside try block to avoid ReferenceError
-  
+
   try {
-    const { 
-      currentSkills, 
-      careerInterests, 
-      educationalBackground, 
-      workExperience, 
-      careerGoals, 
-      personalValues 
+    const {
+      currentSkills,
+      careerInterests,
+      educationalBackground,
+      workExperience,
+      careerGoals,
+      personalValues,
     } = req.body;
 
     // Get user ID from authenticated request
@@ -29,7 +29,7 @@ export const generateCareerRoadmap = async (req, res) => {
         careerGoals,
         personalValues,
       },
-      status: "pending",
+      status: 'pending',
     });
 
     await aiProfile.save();
@@ -42,7 +42,7 @@ export const generateCareerRoadmap = async (req, res) => {
       - Educational Background: ${educationalBackground}
       - Work Experience: ${workExperience} years
       - Career Goals: ${careerGoals}
-      - Personal Values: ${personalValues.join(", ")}
+      - Personal Values: ${personalValues.join(', ')}
 
       Create a detailed, step-by-step roadmap that considers their educational background and experience level.
       Output only valid JSON, no markdown or explanations. 
@@ -65,20 +65,23 @@ export const generateCareerRoadmap = async (req, res) => {
     `;
 
     const response = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
+      'https://openrouter.ai/api/v1/chat/completions',
       {
-        model: "gpt-4o-mini",
+        model: 'gpt-4o-mini',
         messages: [
-          { role: "system", content: "You are a career advisor that outputs JSON only." },
-          { role: "user", content: prompt },
+          {
+            role: 'system',
+            content: 'You are a career advisor that outputs JSON only.',
+          },
+          { role: 'user', content: prompt },
         ],
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer": "http://localhost:3000",
-          "X-Title": "Career Roadmap Generator",
-          "Content-Type": "application/json",
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'Career Roadmap Generator',
+          'Content-Type': 'application/json',
         },
       }
     );
@@ -89,25 +92,25 @@ export const generateCareerRoadmap = async (req, res) => {
     try {
       aiResponse = JSON.parse(rawOutput);
     } catch (err) {
-      console.error("JSON Parse Error:", rawOutput);
-      
+      console.error('JSON Parse Error:', rawOutput);
+
       // Update AI profile with error status
       if (aiProfile) {
-        aiProfile.status = "failed";
-        aiProfile.errorMessage = "Failed to parse JSON from AI";
+        aiProfile.status = 'failed';
+        aiProfile.errorMessage = 'Failed to parse JSON from AI';
         await aiProfile.save();
       }
 
       return res.status(500).json({
         success: false,
-        message: "Failed to parse JSON from AI",
+        message: 'Failed to parse JSON from AI',
         rawOutput,
       });
     }
 
     // Update AI profile with successful response
     aiProfile.aiResponse = aiResponse;
-    aiProfile.status = "completed";
+    aiProfile.status = 'completed';
     await aiProfile.save();
 
     // Update user's aiProfiles array
@@ -125,18 +128,18 @@ export const generateCareerRoadmap = async (req, res) => {
       profileId: aiProfile._id,
     });
   } catch (error) {
-    console.error("OpenRouter Error:", error.response?.data || error.message);
-    
+    console.error('OpenRouter Error:', error.response?.data || error.message);
+
     // Update AI profile with error status if it exists
     if (aiProfile) {
-      aiProfile.status = "failed";
+      aiProfile.status = 'failed';
       aiProfile.errorMessage = error.message;
       await aiProfile.save();
     }
 
     res.status(500).json({
       success: false,
-      message: "Error generating career plan",
+      message: 'Error generating career plan',
       error: error.response?.data || error.message,
     });
   }
@@ -149,17 +152,19 @@ export const getUserProfiles = async (req, res) => {
 
     const profiles = await AIProfile.find({ userId })
       .sort({ createdAt: -1 })
-      .select("profile status createdAt aiResponse.summary aiResponse.totalEstimatedDuration");
+      .select(
+        'profile status createdAt aiResponse.summary aiResponse.totalEstimatedDuration'
+      );
 
     res.status(200).json({
       success: true,
       profiles,
     });
   } catch (error) {
-    console.error("Error fetching user profiles:", error.message);
+    console.error('Error fetching user profiles:', error.message);
     res.status(500).json({
       success: false,
-      message: "Error fetching user profiles",
+      message: 'Error fetching user profiles',
       error: error.message,
     });
   }
@@ -171,13 +176,15 @@ export const getProfileById = async (req, res) => {
     const { profileId } = req.params;
     const userId = req.userId;
 
-    const profile = await AIProfile.findOne({ _id: profileId, userId })
-      .populate("userId", "username email");
+    const profile = await AIProfile.findOne({
+      _id: profileId,
+      userId,
+    }).populate('userId', 'username email');
 
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: "Profile not found",
+        message: 'Profile not found',
       });
     }
 
@@ -186,15 +193,116 @@ export const getProfileById = async (req, res) => {
       profile,
     });
   } catch (error) {
-    console.error("Error fetching profile:", error.message);
+    console.error('Error fetching profile:', error.message);
     res.status(500).json({
       success: false,
-      message: "Error fetching profile",
+      message: 'Error fetching profile',
       error: error.message,
     });
   }
 };
 
+// Update progress for a profile
+export const updateProgress = async (req, res) => {
+  try {
+    const { profileId } = req.params;
+    const userId = req.userId;
+    const { completedSteps, note, noteStepNumber } = req.body || {};
+
+    const profile = await AIProfile.findOne({ _id: profileId, userId });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Profile not found' });
+    }
+
+    if (Array.isArray(completedSteps)) {
+      // Deduplicate while merging
+      const merged = new Set([...(profile.progress?.completedSteps || []), ...completedSteps]);
+      profile.progress = profile.progress || {};
+      profile.progress.completedSteps = Array.from(merged).sort((a, b) => a - b);
+    }
+
+    if (note && typeof note === 'string' && Number.isFinite(Number(noteStepNumber))) {
+      profile.progress = profile.progress || {};
+      profile.progress.notes = profile.progress.notes || [];
+      profile.progress.notes.push({ stepNumber: Number(noteStepNumber), note });
+    }
+
+    await profile.save();
+    return res.json({ success: true, progress: profile.progress });
+  } catch (error) {
+    console.error('Update progress error:', error.message);
+    return res.status(500).json({ success: false, message: 'Error updating progress', error: error.message });
+  }
+};
+
+// Ask AI to suggest next steps based on progress
+export const suggestNextSteps = async (req, res) => {
+  try {
+    const { profileId } = req.params;
+    const userId = req.userId;
+    const { completedSteps } = req.body || {};
+
+    const profile = await AIProfile.findOne({ _id: profileId, userId });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: 'Profile not found' });
+    }
+
+    const mergedCompleted = Array.from(
+      new Set([...(profile.progress?.completedSteps || []), ...(Array.isArray(completedSteps) ? completedSteps : [])])
+    ).sort((a, b) => a - b);
+
+    const roadmap = profile.aiResponse?.roadmap || [];
+    const summary = profile.aiResponse?.summary || '';
+
+    const prompt = `
+      You are helping a user follow a career roadmap. The original roadmap steps are:
+      ${JSON.stringify(roadmap)}
+
+      The user has completed the steps with stepNumber(s): ${mergedCompleted.join(', ') || 'none'}.
+      Provide the next 3-5 most impactful, actionable tasks to continue progress.
+      Each task should include: title, description, estimatedDuration, and an optional resource list.
+      Output JSON only in the format:
+      {
+        "nextSteps": [
+          { "title": "...", "description": "...", "estimatedDuration": "...", "resources": ["..."] }
+        ]
+      }
+    `;
+
+    const response = await axios.post(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You output valid concise JSON only.' },
+          { role: 'user', content: prompt },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'Career Roadmap Next Steps',
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const raw = response.data.choices?.[0]?.message?.content?.trim() || '{}';
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      console.error('Next steps JSON parse error:', raw);
+      return res.status(500).json({ success: false, message: 'Failed to parse AI next steps' });
+    }
+
+    return res.json({ success: true, nextSteps: parsed.nextSteps || [] });
+  } catch (error) {
+    console.error('Suggest next steps error:', error.message);
+    return res.status(500).json({ success: false, message: 'Error suggesting next steps', error: error.message });
+  }
+};
 // Delete AI profile by ID
 export const deleteProfile = async (req, res) => {
   try {
@@ -202,9 +310,9 @@ export const deleteProfile = async (req, res) => {
     const userId = req.userId;
 
     // Find and delete the profile (only if it belongs to the user)
-    const deletedProfile = await AIProfile.findOneAndDelete({ 
-      _id: profileId, 
-      userId 
+    const deletedProfile = await AIProfile.findOneAndDelete({
+      _id: profileId,
+      userId,
     });
 
     if (!deletedProfile) {
@@ -223,13 +331,13 @@ export const deleteProfile = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Profile deleted successfully",
+      message: 'Profile deleted successfully',
     });
   } catch (error) {
-    console.error("Error deleting profile:", error.message);
+    console.error('Error deleting profile:', error.message);
     res.status(500).json({
       success: false,
-      message: "Error deleting profile",
+      message: 'Error deleting profile',
       error: error.message,
     });
   }
