@@ -11,6 +11,7 @@ import {
   Award,
 } from 'lucide-react';
 import aiService from '../services/aiService';
+import jsPDF from 'jspdf';
 
 const RoadmapView = ({ roadmapData, user, onLogout }) => {
   const navigate = useNavigate();
@@ -61,6 +62,135 @@ const RoadmapView = ({ roadmapData, user, onLogout }) => {
 
   // Removed tracking handlers from view-only page
 
+  const handleDownloadPDF = () => {
+    try {
+      const doc = new jsPDF();
+      let yPosition = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const maxWidth = pageWidth - (margin * 2);
+
+      // Title
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text(title, margin, yPosition);
+      yPosition += 10;
+
+      // Summary
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      const summaryLines = doc.splitTextToSize(summary || 'Your personalized career journey', maxWidth);
+      doc.text(summaryLines, margin, yPosition);
+      yPosition += summaryLines.length * 6 + 5;
+
+      // Total Duration
+      if (totalDuration) {
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 255); // Blue color
+        doc.text(`Estimated Duration: ${totalDuration}`, margin, yPosition);
+        yPosition += 8;
+        doc.setTextColor(0, 0, 0); // Reset to black
+      }
+
+      yPosition += 5;
+
+      // Roadmap Steps
+      if (roadmap && roadmap.length > 0) {
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('Roadmap Steps', margin, yPosition);
+        yPosition += 10;
+
+        roadmap.forEach((phase, index) => {
+          // Check if we need a new page
+          if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          
+          // Step number and title
+          const stepTitle = `${phase.stepNumber ? `Step ${phase.stepNumber}: ` : ''}${phase.title || 'Untitled Step'}`;
+          doc.text(stepTitle, margin, yPosition);
+          yPosition += 7;
+
+          // Timeline/Year
+          if (phase.timeline || phase.year) {
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'italic');
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Timeline: ${phase.timeline || phase.year}`, margin, yPosition);
+            yPosition += 6;
+            doc.setTextColor(0, 0, 0);
+          }
+
+          // Description
+          if (phase.description) {
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            const descLines = doc.splitTextToSize(phase.description, maxWidth);
+            doc.text(descLines, margin, yPosition);
+            yPosition += descLines.length * 5 + 3;
+          }
+
+          // Estimated Duration
+          if (phase.estimatedDuration) {
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 255);
+            doc.text(`Duration: ${phase.estimatedDuration}`, margin, yPosition);
+            yPosition += 5;
+            doc.setTextColor(0, 0, 0);
+          }
+
+          // Resources/Items
+          const items = phase.resources || phase.items || [];
+          if (items.length > 0) {
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.text('Key Points:', margin, yPosition);
+            yPosition += 5;
+            
+            items.forEach((item) => {
+              if (yPosition > 270) {
+                doc.addPage();
+                yPosition = 20;
+              }
+              const itemLines = doc.splitTextToSize(`  • ${item}`, maxWidth - 10);
+              doc.text(itemLines, margin + 5, yPosition);
+              yPosition += itemLines.length * 4.5;
+            });
+          }
+
+          yPosition += 8; // Space between steps
+        });
+      }
+
+      // Footer with date
+      const pageCount = doc.internal.pages.length - 1;
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `Generated on ${new Date().toLocaleDateString()} - Page ${i} of ${pageCount}`,
+          margin,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+        doc.setTextColor(0, 0, 0);
+      }
+
+      // Generate filename
+      const filename = `Career_Roadmap_${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(filename);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
   return (
   <div className="min-h-screen bg-gray-50">
     <Navigation user={user} onLogout={onLogout} />
@@ -91,9 +221,12 @@ const RoadmapView = ({ roadmapData, user, onLogout }) => {
           )}
         </div>
         <div className="flex space-x-3">
-          <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <button 
+            onClick={handleDownloadPDF}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
             <Save className="h-4 w-4 mr-2" />
-            Save Roadmap
+            Save Roadmap as PDF
           </button>
           <button 
             onClick={() => navigate('/input-form')}
