@@ -128,41 +128,65 @@ function ProgressTracker({ user, onLogout }) {
       const history = aiMessages.slice(-6).map(m => ({ role: m.role, content: m.content }));
       const res = await aiService.suggestNextSteps(profileId, completedSteps, content, history);
       let suggestions = res.nextSteps || [];
+      
+      // Debug logging
+      console.log('AI Response:', { 
+        hasSuggestions: suggestions.length > 0, 
+        count: suggestions.length,
+        suggestions: suggestions 
+      });
 
       // If the user asks about certifications or budget options, tailor suggestions
       if (detectCertificationIntent(content)) {
         suggestions = buildCertificationPlanSuggestions();
       }
 
-      // Build fallback suggestions if none returned
-      if (!suggestions.length) {
+      // Build fallback suggestions if none returned OR if backend returned empty
+      const useFallback = !suggestions.length;
+      if (useFallback) {
         suggestions = buildFallbackSuggestions(content, roadmap, completedSteps);
       }
 
-      // De-duplicate against last shown nextSteps and prior AI messages
-      const shown = new Set([
-        ...nextSteps.map(s => (s.title || s).toString().trim().toLowerCase()),
-        ...aiMessages
+      // De-duplicate: Only check against recent messages (last 2 assistant messages) to avoid over-filtering
+      const recentShown = new Set(
+        aiMessages
           .filter(m => m.role === 'assistant')
-          .flatMap(m => (m.content.match(/- (.+)/g) || []).map(line => line.replace(/^-[\s]*/, '').toLowerCase().trim())),
-      ]);
-      const unique = suggestions.filter(s => !shown.has((s.title || s).toString().trim().toLowerCase()));
+          .slice(-2) // Only check last 2 assistant messages
+          .flatMap(m => {
+            const matches = m.content.match(/- (.+)/g) || [];
+            return matches.map(line => line.replace(/^-[\s]*/, '').toLowerCase().trim());
+          })
+      );
+      
+      // Always show fallback suggestions even if similar to previous (they're context-specific)
+      const unique = useFallback 
+        ? suggestions.slice(0, 5) // Always show fallback suggestions
+        : suggestions.filter(s => !recentShown.has((s.title || s).toString().trim().toLowerCase()));
 
-      const text = unique.length
-        ? `Given your message, here are tailored next steps:\n- ${unique.map(s => s.title || s).join('\n- ')}`
+      // If still empty after deduplication but we have suggestions, use first 3
+      const finalSuggestions = unique.length > 0 ? unique : suggestions.slice(0, 3);
+
+      const text = finalSuggestions.length
+        ? `Given your message, here are tailored next steps:\n- ${finalSuggestions.map(s => s.title || s).join('\n- ')}`
         : 'I could not infer new steps. Try marking a roadmap step done or add more context.';
       setAiMessages((prev) => [
         ...prev,
         { role: 'assistant', content: text, id: crypto.randomUUID(), ts: Date.now() },
       ]);
-      if (unique.length) setNextSteps(unique);
+      if (finalSuggestions.length) setNextSteps(finalSuggestions);
     } catch (e) {
+      // On error, show fallback suggestions instead of just error message
+      const fallback = buildFallbackSuggestions(content, roadmap, completedSteps);
       const msg = e?.message || 'Failed to fetch suggestions right now.';
       setChatError(msg);
+      const errorText = fallback.length
+        ? `${msg}\n\nHere are some helpful next steps:\n- ${fallback.slice(0, 3).map(s => s.title || s).join('\n- ')}`
+        : msg;
       setAiMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: msg, id: crypto.randomUUID(), ts: Date.now() },
+        { role: 'assistant', content: errorText, id: crypto.randomUUID(), ts: Date.now() },
       ]);
+      if (fallback.length) setNextSteps(fallback.slice(0, 3));
     } finally {
       setAiLoading(false);
     }
@@ -170,22 +194,60 @@ function ProgressTracker({ user, onLogout }) {
 
   function buildFallbackSuggestions(message, roadmapList, doneSteps) {
     const remaining = (roadmapList || []).filter(p => !doneSteps.includes(p.stepNumber));
-    const byOrder = remaining.slice(0, 3).map(p => ({ title: p.title }));
+    const byOrder = remaining.slice(0, 3).map(p => ({ title: `Continue with: ${p.title}` }));
     const m = (message || '').toLowerCase();
     const keyword = [];
-    if (m.includes('auth')) keyword.push({ title: 'Review auth step requirements and test flow' });
-    if (m.includes('api')) keyword.push({ title: 'Define API contracts and add a test call' });
-    if (m.includes('ui') || m.includes('frontend')) keyword.push({ title: 'Build a small UI slice for this step' });
-    if (m.includes('error') || m.includes('bug')) keyword.push({ title: 'Create minimal repro and add a unit test' });
-    const merged = [...byOrder, ...keyword];
-    if (!merged.length) {
-      return [
-        { title: 'Write down the specific goal and acceptance criteria' },
-        { title: 'Identify blockers, assumptions, and unknowns for the step' },
-        { title: 'Create a 30-minute spike/proof-of-concept to validate approach' },
-      ];
+    
+    // Expanded keyword matching for better suggestions
+    if (m.includes('auth') || m.includes('login') || m.includes('password')) {
+      keyword.push({ title: 'Review authentication requirements and test the login flow' });
+      keyword.push({ title: 'Set up secure password hashing and session management' });
     }
-    return merged;
+    if (m.includes('api') || m.includes('endpoint') || m.includes('backend')) {
+      keyword.push({ title: 'Define API contracts, endpoints, and add test calls' });
+      keyword.push({ title: 'Document API endpoints and create Postman collections' });
+    }
+    if (m.includes('ui') || m.includes('frontend') || m.includes('interface') || m.includes('design')) {
+      keyword.push({ title: 'Create wireframes and build a small UI component slice' });
+      keyword.push({ title: 'Set up responsive design and accessibility features' });
+    }
+    if (m.includes('error') || m.includes('bug') || m.includes('issue') || m.includes('problem')) {
+      keyword.push({ title: 'Create a minimal reproduction case and add unit tests' });
+      keyword.push({ title: 'Review error logs and identify the root cause' });
+    }
+    if (m.includes('database') || m.includes('db') || m.includes('data')) {
+      keyword.push({ title: 'Design the database schema and create migration scripts' });
+      keyword.push({ title: 'Set up database indexes and optimize queries' });
+    }
+    if (m.includes('test') || m.includes('testing') || m.includes('quality')) {
+      keyword.push({ title: 'Write unit tests for core functionality' });
+      keyword.push({ title: 'Set up automated testing pipeline' });
+    }
+    if (m.includes('deploy') || m.includes('host') || m.includes('production')) {
+      keyword.push({ title: 'Set up staging environment and deployment pipeline' });
+      keyword.push({ title: 'Configure CI/CD and monitor deployment health' });
+    }
+    if (m.includes('learn') || m.includes('study') || m.includes('skill')) {
+      keyword.push({ title: 'Find relevant online courses or tutorials' });
+      keyword.push({ title: 'Practice with hands-on projects and build a portfolio' });
+    }
+    if (m.includes('job') || m.includes('career') || m.includes('interview')) {
+      keyword.push({ title: 'Update your resume and LinkedIn profile' });
+      keyword.push({ title: 'Practice coding interviews and system design problems' });
+    }
+    
+    // Always include some generic helpful suggestions
+    const generic = [
+      { title: 'Break down the task into smaller, manageable steps' },
+      { title: 'Research best practices and review documentation' },
+      { title: 'Create a proof-of-concept to validate your approach' },
+    ];
+    
+    // Combine: keyword suggestions first, then roadmap steps, then generic
+    const merged = [...keyword.slice(0, 3), ...byOrder.slice(0, 2), ...generic.slice(0, 2)];
+    
+    // Always return at least 3-5 suggestions
+    return merged.slice(0, 5);
   }
 
   function detectCertificationIntent(message) {

@@ -15,13 +15,27 @@ class AuthService {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Signup failed');
+        // Use backend message if available, otherwise provide context-aware defaults
+        const message = data.message || 
+          (response.status === 409 ? 'This account already exists. Please try logging in or use a different email/username.' :
+           response.status === 400 ? 'Please check your input and try again.' :
+           response.status >= 500 ? 'Server error occurred. Please try again in a moment.' :
+           'Signup failed. Please try again.');
+        throw new Error(message);
       }
 
       return data;
     } catch (error) {
       console.error('Signup error:', error);
-      throw error;
+      // If it's already an Error with a message, re-throw it
+      if (error instanceof Error) {
+        throw error;
+      }
+      // Handle network errors
+      if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+        throw new Error('Unable to connect to server. Please check your internet connection and try again.');
+      }
+      throw new Error(error.message || 'An unexpected error occurred. Please try again.');
     }
   }
 

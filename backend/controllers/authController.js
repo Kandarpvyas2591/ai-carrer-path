@@ -18,9 +18,16 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    // Check for duplicate username
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(409).json({ message: "This username is already taken. Please choose a different one." });
+    }
+
+    // Check for duplicate email
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
-      return res.status(409).json({ message: "Email already in use" });
+      return res.status(409).json({ message: "This email is already registered. Please use a different email or try logging in." });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -39,7 +46,27 @@ export const signup = async (req, res) => {
       });
   } catch (err) {
     console.error("Signup error:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    
+    // Handle MongoDB duplicate key errors (code 11000)
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0];
+      if (field === 'username') {
+        return res.status(409).json({ message: "This username is already taken. Please choose a different one." });
+      }
+      if (field === 'email') {
+        return res.status(409).json({ message: "This email is already registered. Please use a different email or try logging in." });
+      }
+      return res.status(409).json({ message: `This ${field} is already in use. Please choose a different value.` });
+    }
+    
+    // Handle validation errors
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message).join(', ');
+      return res.status(400).json({ message: messages || "Validation failed. Please check your input." });
+    }
+    
+    // Generic server error for unexpected issues
+    return res.status(500).json({ message: "Something went wrong. Please try again later or contact support if the problem persists." });
   }
 };
 

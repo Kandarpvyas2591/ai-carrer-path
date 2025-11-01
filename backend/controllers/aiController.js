@@ -240,7 +240,7 @@ export const suggestNextSteps = async (req, res) => {
   try {
     const { profileId } = req.params;
     const userId = req.userId;
-    const { completedSteps } = req.body || {};
+    const { completedSteps, message, history } = req.body || {};
 
     const profile = await AIProfile.findOne({ _id: profileId, userId });
     if (!profile) {
@@ -254,29 +254,65 @@ export const suggestNextSteps = async (req, res) => {
     const roadmap = profile.aiResponse?.roadmap || [];
     const summary = profile.aiResponse?.summary || '';
 
-    const prompt = `
-      You are helping a user follow a career roadmap. The original roadmap steps are:
-      ${JSON.stringify(roadmap)}
+    // Build context-aware prompt
+    let userContext = '';
+    if (message && message.trim()) {
+      userContext = `\n\nUser's current question/difficulty: "${message.trim()}"\nPlease address this specific concern in your suggestions.`;
+    }
 
-      The user has completed the steps with stepNumber(s): ${mergedCompleted.join(', ') || 'none'}.
-      Provide the next 3-5 most impactful, actionable tasks to continue progress.
-      Each task should include: title, description, estimatedDuration, and an optional resource list.
-      Output JSON only in the format:
-      {
-        "nextSteps": [
-          { "title": "...", "description": "...", "estimatedDuration": "...", "resources": ["..."] }
-        ]
-      }
-    `;
+    const roadmapSummary = roadmap.length > 0 
+      ? roadmap.map(p => `Step ${p.stepNumber || 'N/A'}: ${p.title || 'Untitled'}`).join('\n')
+      : 'No roadmap steps available.';
+
+    const systemPrompt = `You are a helpful career coach assisting a user with their career roadmap. 
+Always provide practical, actionable next steps. Output only valid JSON - no markdown, no explanations.`;
+
+    const userPrompt = `You are helping a user follow their career roadmap.
+
+Original roadmap steps:
+${roadmapSummary}
+
+Summary: ${summary || 'Career development path'}
+
+The user has completed steps with stepNumber(s): ${mergedCompleted.length > 0 ? mergedCompleted.join(', ') : 'none (just starting)'}.${userContext}
+
+Based on their progress${message ? ' and their current question' : ''}, provide 3-5 highly relevant, actionable next steps that will help them advance.
+
+Each step should be specific and practical. Output JSON only in this exact format:
+{
+  "nextSteps": [
+    { 
+      "title": "Short actionable task title (max 60 chars)",
+      "description": "Brief explanation (1-2 sentences)",
+      "estimatedDuration": "time estimate",
+      "resources": ["resource 1", "resource 2"]
+    }
+  ]
+}`;
+
+    // Build messages array with conversation history if provided
+    const messages = [
+      { role: 'system', content: systemPrompt }
+    ];
+
+    // Add conversation history if provided (last 6 messages)
+    if (Array.isArray(history) && history.length > 0) {
+      const recentHistory = history.slice(-6); // Last 6 messages
+      recentHistory.forEach(msg => {
+        if (msg.role && msg.content) {
+          messages.push({ role: msg.role, content: msg.content });
+        }
+      });
+    }
+
+    // Add the current prompt
+    messages.push({ role: 'user', content: userPrompt });
 
     const response = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
         model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You output valid concise JSON only.' },
-          { role: 'user', content: prompt },
-        ],
+        messages: messages,
       },
       {
         headers: {
@@ -289,18 +325,40 @@ export const suggestNextSteps = async (req, res) => {
     );
 
     const raw = response.data.choices?.[0]?.message?.content?.trim() || '{}';
-    let parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      console.error('Next steps JSON parse error:', raw);
-      return res.status(500).json({ success: false, message: 'Failed to parse AI next steps' });
+    
+    // Try to extract JSON from markdown code blocks if present
+    let jsonStr = raw;
+    const jsonMatch = raw.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
     }
 
-    return res.json({ success: true, nextSteps: parsed.nextSteps || [] });
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('Next steps JSON parse error:', raw);
+      // Return empty array instead of error so frontend can use fallback
+      return res.json({ success: true, nextSteps: [] });
+    }
+
+    const nextSteps = parsed.nextSteps || [];
+    
+    // Validate and ensure we have at least title for each step
+    const validSteps = nextSteps
+      .filter(step => step && (step.title || step))
+      .map(step => ({
+        title: step.title || step,
+        description: step.description || '',
+        estimatedDuration: step.estimatedDuration || '',
+        resources: Array.isArray(step.resources) ? step.resources : []
+      }));
+
+    return res.json({ success: true, nextSteps: validSteps });
   } catch (error) {
     console.error('Suggest next steps error:', error.message);
-    return res.status(500).json({ success: false, message: 'Error suggesting next steps', error: error.message });
+    // Return empty array so frontend can use fallback instead of showing error
+    return res.json({ success: true, nextSteps: [] });
   }
 };
 // Delete AI profile by ID
